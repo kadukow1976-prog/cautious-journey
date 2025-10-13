@@ -2,251 +2,215 @@
 <html lang="ru">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Статус ремонта — УграРемКомп</title>
+<title>Поиск по базе (Лист1) — UgraRemKomp</title>
 <style>
-:root{--bg:#f6f7f9;--card:#fff;--text:#1f2328;--muted:#6b7280;--line:#e5e7eb;--brand:#19c37d;--accent:#111}
+:root{--bg:#f6f7f9;--card:#fff;--line:#e5e7eb;--text:#111827;--muted:#6b7280;--brand:#19c37d}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--text);font:16px/1.45 -apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Arial,sans-serif}
-.wrap{max-width:720px;margin:0 auto;padding:18px}
-h1{margin:0 0 10px}
+.wrap{max-width:1100px;margin:0 auto;padding:18px}
 .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px}
-.row{display:flex;gap:10px;flex-wrap:wrap}
-input{padding:10px 12px;border:1px solid var(--line);border-radius:10px;font-size:16px;flex:1}
-.btn{padding:12px 16px;border-radius:10px;background:var(--brand);border:1px solid var(--brand);color:#fff;font-weight:700;cursor:pointer}
-.btn[disabled]{opacity:.6;cursor:progress}
-.table{background:var(--card);border:1px solid var(--line);border-radius:12px;margin-top:12px;overflow:hidden}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+input[type="text"],select{padding:10px 12px;border:1px solid var(--line);border-radius:10px;font-size:16px}
+input[type="text"]{flex:1}
+.btn{padding:10px 14px;border-radius:10px;background:var(--brand);border:1px solid var(--brand);color:#fff;font-weight:700;cursor:pointer}
+.btn.ghost{background:#fff;color:#111;border-color:var(--line)}
+.small{color:var(--muted);font-size:13px}
+.kv{display:flex;gap:12px;flex-wrap:wrap}
+.kv>*{white-space:nowrap}
+.table{margin-top:12px;background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:auto}
 .table table{width:100%;border-collapse:collapse}
-.table th,.table td{padding:12px;border-bottom:1px solid var(--line);vertical-align:top}
-.table th{background:#fafafa;text-align:left}
-.note{color:var(--muted);font-size:13px;margin-top:6px}
+.table th,.table td{padding:10px;border-bottom:1px solid var(--line);vertical-align:top}
+.table th{background:#fafafa;position:sticky;top:0;z-index:1;user-select:none;cursor:pointer}
+.table th .dir{opacity:.6;margin-left:6px}
+mark{background:#fff59d}
+.pager{display:flex;gap:8px;align-items:center;justify-content:space-between;margin-top:8px}
+.pager .right{display:flex;gap:8px;align-items:center}
 .err{background:#fee2e2;color:#991b1b;border:1px solid #fecaca;padding:10px;border-radius:10px;margin-top:10px;display:none}
 .ok{background:#ecfdf5;color:#065f46;border:1px solid #a7f3d0;padding:10px;border-radius:10px;margin-top:10px;display:none}
-.badge{display:inline-block;padding:4px 8px;border-radius:999px;background:#f3f4f6;border:1px solid #e5e7eb}
-.small{font-size:13px;color:var(--muted)}
-summary{cursor:pointer}
-.matches{margin-top:10px}
-.kv{display:grid;grid-template-columns:160px 1fr;gap:0}
-.kv>div{padding:12px;border-bottom:1px solid var(--line)}
-.kv>div:nth-child(odd){background:#fafafa;font-weight:600}
 .copy{background:#111;border-color:#111}
+.hidden-col{opacity:.5}
+@media (max-width:640px){ .wrap{padding:12px} input[type="text"]{font-size:15px} }
 </style>
 </head>
 <body>
 <div class="wrap">
-  <h1>Проверка статуса ремонта</h1>
+  <h1>Поиск по базе (Лист1)</h1>
   <div class="card">
     <div class="row">
-      <input id="q" placeholder="Введите номер заказа (например, RK-1047) или последние 4–6 цифр телефона">
-      <button id="find" class="btn">Найти</button>
+      <input id="q" type="text" placeholder="Ищите по словам, числам, ссылкам — по всем колонкам" autocomplete="off">
+      <select id="per">
+        <option value="25">25 на странице</option>
+        <option value="50" selected>50 на странице</option>
+        <option value="100">100 на странице</option>
+      </select>
       <button id="share" class="btn copy" title="Скопировать ссылку с запросом" style="display:none">Скопировать ссылку</button>
+      <button id="export" class="btn ghost" title="Скачать результаты CSV">Экспорт CSV</button>
     </div>
-    <div class="note">Данные подтягиваются из публичного CSV. При расхождении позвоните <a href="tel:+79107116072">+7 910 711-60-72</a>.</div>
+    <div class="kv small">
+      <div id="meta">Загружаю…</div>
+      <div id="filterInfo" class="small"></div>
+    </div>
     <div id="err" class="err"></div>
     <div id="ok" class="ok"></div>
   </div>
 
-  <div id="box" class="table" style="display:none"></div>
+  <div class="kv small" id="colToggles" style="margin:10px 0"></div>
 
-  <details id="allBox" class="matches" style="display:none">
-    <summary>Показать все совпадения</summary>
-    <div id="all"></div>
-  </details>
+  <div id="box" class="table" style="display:none"></div>
+  <div id="pager" class="pager" style="display:none">
+    <div class="left small" id="pageinfo"></div>
+    <div class="right">
+      <button id="prev" class="btn ghost">Назад</button>
+      <button id="next" class="btn">Вперёд</button>
+    </div>
+  </div>
 </div>
 
 <script>
-/* Основано на вашем варианте. Добавлены: таймаут и отмена fetch, подсветка статуса,
-   маскировка телефона в UI, параметр ?q= и копирование ссылки, показ всех совпадений. */
+// ===== ВАША ПУБЛИЧНАЯ CSV‑ССЫЛКА (Лист1) =====
+const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSukdSjSlBQLCubJFGGNTjMTrCSMh56jbog4MM9E4m8hfJpnZhc4hHSxVpK96uFMxDe5RYCBQJ9dckN/pub?gid=0&single=true&output=csv";
+// ============================================
 
-// 1) ПУБЛИЧНАЯ ссылка на CSV (Google Sheets → Файл → Опубликовать → CSV)
-const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRXNuav2W77loTt79Aheo9Mb_oN6ihVD1b0uV9GaiBti26bhhcHmjOMNyoAEEY9lvxCG86p7PN5_GvI/pub?gid=0&single=true&output=csv";
-
-// Настройка цветов статусов (регэксп -> стили). Подправьте под свои статусы.
-const STATUS_STYLES = [
-  { re: /готов|выдан|заверш/i, bg:'#ecfdf5', text:'#065f46', br:'#a7f3d0' },
-  { re: /ожида|запчаст|поставка/i, bg:'#fff7ed', text:'#9a3412', br:'#fed7aa' },
-  { re: /в\s*работе|диагност|ремонт/i, bg:'#eff6ff', text:'#1e3a8a', br:'#bfdbfe' },
-  { re: /отказ|аннулир|закрыт без ремонта/i, bg:'#fee2e2', text:'#991b1b', br:'#fecaca' },
-];
-
-function styleForStatus(s){
-  for(const m of STATUS_STYLES){ if(m.re.test(String(s||''))) return m; }
-  return {bg:'#f3f4f6', text:'#111827', br:'#e5e7eb'}; // по умолчанию
-}
-
+// Утилиты
 function parseCSV(text){
   const first = text.split(/\r?\n/,1)[0]||"";
   const sep = (first.split(';').length-1) > (first.split(',').length-1) ? ';' : ',';
-  const rows=[], row=[], pushRow=()=>{if(row.length)rows.push(row.splice(0));};
+  const rows=[], row=[], pushRow=()=>{ if(row.length) rows.push(row.splice(0)); };
   let cell="", q=false;
-  for (let i=0;i<text.length;i++){
+  for(let i=0;i<text.length;i++){
     const ch=text[i];
-    if(q){ if(ch=='"'){ if(text[i+1]=='"'){cell+='"';i++;} else q=false; }
-          else cell+=ch; continue; }
+    if(q){ if(ch=='"'){ if(text[i+1]=='"'){cell+='"';i++;} else q=false; } else cell+=ch; continue; }
     if(ch=='"'){ q=true; continue; }
-    if(ch==sep){ row.push(cell.trim()); cell=""; continue; }
-    if(ch=='\n'){ row.push(cell.trim()); cell=""; pushRow(); continue; }
+    if(ch==sep){ row.push(cell); cell=""; continue; }
+    if(ch=='\n'){ row.push(cell); cell=""; pushRow(); continue; }
     if(ch=='\r'){ continue; }
     cell+=ch;
   }
-  if(cell!==""||row.length){ row.push(cell.trim()); pushRow(); }
-  return rows.filter(r=>r.some(c=>c!==""));
+  if(cell!==""||row.length){ row.push(cell); pushRow(); }
+  return rows.filter(r=>r.some(c=>String(c).trim()!==""));
 }
+const norm = s => String(s||"").toLowerCase().replaceAll('ё','е');
+const escapeHTML = s => String(s).replace(/[&<>\"]/g, m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[m]));
+const urlify = s => { const v=String(s||"").trim(); const m=v.match(/^(https?:\/\/[^\s]+)$/i); return m?`<a href="${escapeHTML(v)}" target="_blank" rel="noopener">${escapeHTML(v)}</a>`:escapeHTML(v); };
+const mark = (text, q) => { if(!q) return urlify(text); try{ const re=new RegExp("("+q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+")","ig"); return urlify(text).replace(re,'<mark>$1</mark>'); }catch{ return urlify(text); } };
 
-const norm = s => String(s||"").toLowerCase().replaceAll('ё','е').trim();
-const onlyDigits = s => String(s||"").replace(/[^\d]/g,'');
-const trimId = s => norm(String(s||"").replace(/[\s-]+/g,''));
+// Данные
+let HEAD=[], DATA=[], VIEW=[], PAGE=1, PER=50, SORT_COL=-1, SORT_DIR=1, HIDDEN={};
 
-const fmtDate = iso => {
-  const d = new Date(iso);
-  if (isNaN(+d)) return String(iso||'—');
-  return d.toLocaleString('ru-RU');
-};
-
-function maskPhone(s){
-  const d = onlyDigits(s);
-  if(!d) return '—';
-  const tail = d.slice(-4);
-  return '••• ••• ' + tail; // избегаем шаблонной строки с $
-}
-
-function toObj(rows){
-  const head = rows[0].map(h=>norm(h));
-  const iId = head.indexOf("order_id");
-  const iPhone = head.indexOf("phone");
-  const iStatus = head.indexOf("status");
-  const iComment = head.indexOf("comment");
-  const iUpdated = head.indexOf("updated_at");
-  if (iId<0||iPhone<0||iStatus<0||iUpdated<0) throw new Error("Нужны колонки: order_id, phone, status, updated_at");
-  return rows.slice(1).map(r=>({
-    id: r[iId]||"", phone:r[iPhone]||"", status:r[iStatus]||"",
-    comment:r[iComment]||"", updated:r[iUpdated]||""
-  }));
-}
-
-function renderOne(m){
-  const st = styleForStatus(m.status);
-  return `
-    <div class="kv">
-      <div>Номер заказа</div><div><span class="badge">${m.id||'—'}</span></div>
-      <div>Телефон</div><div>${maskPhone(m.phone)}</div>
-      <div>Статус</div><div><span style="display:inline-block;padding:4px 10px;border-radius:999px;background:${st.bg};color:${st.text};border:1px solid ${st.br};font-weight:600">${m.status||'—'}</span></div>
-      <div>Комментарий</div><div>${m.comment||'—'}</div>
-      <div>Обновлено</div><div>${fmtDate(m.updated)}</div>
-      <div>Связаться</div><div><a class="btn" href="tel:+79107116072">Позвонить</a></div>
-    </div>`;
-}
-
-function renderAll(list){
-  const rows = list.map(x=>{
-    const st = styleForStatus(x.status);
-    return `<tr>
-      <td><span class="badge">${x.id||'—'}</span></td>
-      <td><span style="display:inline-block;padding:2px 8px;border-radius:999px;background:${st.bg};color:${st.text};border:1px solid ${st.br}">${x.status||'—'}</span></td>
-      <td>${fmtDate(x.updated)}</td>
-    </tr>`;
-  }).join('');
-  return `<div class="table"><table><thead><tr><th>Заказ</th><th>Статус</th><th>Обновлено</th></tr></thead><tbody>${rows}</tbody></table></div>`;
-}
-
-function setBusy(b){
-  const btn = document.getElementById('find');
-  btn.disabled = b;
-  btn.textContent = b ? 'Идёт поиск…' : 'Найти';
-}
-
-function setShareVisibility(v){
-  document.getElementById('share').style.display = v ? '' : 'none';
-}
-
-async function fetchCSV(url, ms=12000){
-  const ctrl = new AbortController();
-  const t = setTimeout(()=>ctrl.abort(), ms);
+async function fetchCSV(url){
+  const ctrl=new AbortController(); const t=setTimeout(()=>ctrl.abort(),12000);
   try{
-    const res = await fetch(url,{cache:'no-store', signal:ctrl.signal});
+    const res=await fetch(url,{cache:'no-store',signal:ctrl.signal});
     if(!res.ok) throw new Error(`HTTP ${res.status}`);
-    const text = await res.text();
-    if(!text.trim()) throw new Error('Пустой CSV');
-    return text;
+    const txt=await res.text();
+    if(!txt.trim()) throw new Error('Пустой CSV');
+    return parseCSV(txt);
   } finally{ clearTimeout(t); }
 }
 
-async function find(){
-  const qEl = document.getElementById('q');
-  const input = qEl.value.trim();
-  const err = document.getElementById('err');
-  const ok  = document.getElementById('ok');
-  const box = document.getElementById('box');
-  const allBox = document.getElementById('allBox');
-  const all = document.getElementById('all');
+function detectNum(v){ const n = parseFloat(String(v).replace(/\s/g,'')); return !Number.isNaN(n) && isFinite(n); }
 
-  err.style.display='none'; ok.style.display='none'; box.style.display='none'; allBox.style.display='none';
-  if (!input){ err.textContent="Введите номер заказа или телефон"; err.style.display='block'; return; }
-
-  // сохраняем запрос в URL (?q=) и в localStorage
-  const url = new URL(location.href);
-  url.searchParams.set('q', input);
-  history.replaceState(null,'',url);
-  localStorage.setItem('status.q', input);
-  setShareVisibility(true);
-
-  try{
-    setBusy(true);
-    const rows = parseCSV(await fetchCSV(CSV_URL));
-    const list = toObj(rows);
-
-    const qId = trimId(input);
-    const tail = onlyDigits(input).slice(-6); // 4–6 последних цифр
-
-    const matches = list.filter(x=>{
-      const byIdEq = trimId(x.id)===qId;
-      const byIdStarts = qId.length>=5 && trimId(x.id).startsWith(qId);
-      const byPhone = tail && onlyDigits(x.phone).endsWith(tail) && tail.length>=4;
-      return byIdEq || byIdStarts || byPhone;
-    });
-
-    if(!matches.length){ err.textContent="Заказ не найден. Проверьте ID или 4–6 цифр телефона."; err.style.display='block'; return; }
-
-    // Покажем последний по дате
-    matches.sort((a,b)=> new Date(b.updated) - new Date(a.updated));
-    const m = matches[0];
-
-    box.innerHTML = renderOne(m);
-    box.style.display='block';
-
-    ok.innerHTML = `Найдено совпадений: <b>${matches.length}</b>`;
-    ok.style.display='block';
-
-    if(matches.length>1){
-      all.innerHTML = renderAll(matches);
-      allBox.style.display='block';
-    }
-  }catch(e){
-    err.textContent = "Ошибка: " + (e.message||e) + ". Проверьте публикацию CSV и доступ по ссылке.";
-    err.style.display='block';
-  }finally{
-    setBusy(false);
-  }
+function sortView(){
+  if(SORT_COL<0) return;
+  VIEW.sort((a,b)=>{
+    const va=a[SORT_COL]??'', vb=b[SORT_COL]??'';
+    const aNum=detectNum(va), bNum=detectNum(vb);
+    if(aNum && bNum){ return (parseFloat(va)-parseFloat(vb))*SORT_DIR; }
+    return String(va).localeCompare(String(vb),'ru',{numeric:true})*SORT_DIR;
+  });
 }
 
-// Копирование ссылки с текущим ?q=
-document.getElementById('share').addEventListener('click', async ()=>{
+function renderToggles(){
+  const ct=document.getElementById('colToggles');
+  ct.innerHTML = HEAD.map((h,i)=>{
+    const id='col'+i; const checked = HIDDEN[i]?'' : 'checked';
+    return `<label class="small"><input type="checkbox" id="${id}" ${checked}> ${escapeHTML(h)}</label>`;
+  }).join(' \u00A0 ');
+  HEAD.forEach((_,i)=>{
+    const id='col'+i; const el=document.getElementById(id); if(!el) return;
+    el.addEventListener('change',()=>{ HIDDEN[i]=!el.checked; render(); });
+  });
+}
+
+function render(){
+  const box=document.getElementById('box');
+  const q=document.getElementById('q').value.trim();
+  if(!VIEW.length){ box.style.display='none'; document.getElementById('pager').style.display='none'; document.getElementById('pageinfo').textContent=''; return; }
+  sortView();
+  const start=(PAGE-1)*PER, end=Math.min(start+PER, VIEW.length);
+  const rows=VIEW.slice(start,end);
+  let thead = '<tr>'+HEAD.map((h,i)=>`<th data-i="${i}" title="Сортировка">${escapeHTML(h)}${SORT_COL===i?`<span class="dir">${SORT_DIR>0?'▲':'▼'}</span>`:''}</th>`).join('')+'</tr>';
+  let tbody = rows.map(r=>'<tr>'+r.map((c,i)=>`<td style="${HIDDEN[i]?'display:none':''}">${mark(c,q)}</td>`).join('')+'</tr>').join('');
+  // применим скрытие к заголовкам
+  thead = thead.replace(/<th data-i="(\d+)"/g,(m,d)=>`<th data-i="${d}" style="${HIDDEN[+d]?'display:none':''}"`);
+  box.innerHTML = `<div class="table"><table><thead>${thead}</thead><tbody>${tbody}</tbody></table></div>`;
+  box.style.display='block';
+  // вешаем sort
+  box.querySelectorAll('th').forEach(th=>{
+    th.addEventListener('click',()=>{ const i=+th.getAttribute('data-i'); if(Number.isNaN(i)) return; if(SORT_COL===i) SORT_DIR*=-1; else { SORT_COL=i; SORT_DIR=1; } PAGE=1; render(); });
+  });
+  // pager
+  const pager=document.getElementById('pager');
+  pager.style.display = VIEW.length>PER ? 'flex' : 'none';
+  document.getElementById('pageinfo').textContent = `${start+1}–${end} из ${VIEW.length}`;
+  document.getElementById('prev').disabled = PAGE<=1;
+  document.getElementById('next').disabled = end>=VIEW.length;
+}
+
+function applyFilter(){
+  const q = norm(document.getElementById('q').value.trim());
+  if(!q){ VIEW = DATA.slice(); PAGE=1; render(); document.getElementById('ok').textContent='Загружено строк: '+VIEW.length; document.getElementById('ok').style.display='block'; return; }
+  VIEW = DATA.filter(row => row.some(c => norm(c).includes(q)));
+  PAGE=1; render();
+  const ok=document.getElementById('ok'); ok.textContent=`Найдено: ${VIEW.length}`; ok.style.display='block';
+}
+
+function setShare(){
+  const val=document.getElementById('q').value.trim();
+  const url=new URL(location.href); if(val) url.searchParams.set('q', val); else url.searchParams.delete('q');
+  history.replaceState(null,'',url);
+  document.getElementById('share').style.display = val?'' : 'none';
+}
+
+function exportCSV(){
+  if(!VIEW.length) return;
+  const out=[HEAD].concat(VIEW).map(r=>r.map(v=>{
+    const s=String(v??'');
+    return /[",\n;]/.test(s) ? '"'+s.replace(/"/g,'""')+'"' : s;
+  }).join(',')).join('\n');
+  const blob=new Blob([out],{type:'text/csv;charset=utf-8'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='search-export.csv'; a.click(); URL.revokeObjectURL(a.href);
+}
+
+async function init(){
+  const err=document.getElementById('err'); const ok=document.getElementById('ok');
+  err.style.display='none'; ok.style.display='none';
   try{
-    await navigator.clipboard.writeText(location.href);
-    const ok = document.getElementById('ok');
-    ok.textContent = 'Ссылка скопирована';
-    ok.style.display='block';
-  }catch{ /* игнор */ }
-});
+    const rows = await fetchCSV(CSV_URL);
+    HEAD = rows[0]||[]; DATA = rows.slice(1); VIEW = DATA.slice();
+    document.getElementById('meta').textContent = `Источник: Google Sheets CSV · Колонок: ${HEAD.length} · Строк: ${DATA.length}`;
+    renderToggles();
+    // авто из ?q=
+    const q = new URL(location.href).searchParams.get('q') || '';
+    if(q){ document.getElementById('q').value=q; }
+    setShare(); render(); if(q) applyFilter(); else { ok.textContent='Загружено строк: '+DATA.length; ok.style.display='block'; }
+  }catch(e){ err.textContent = 'Ошибка: '+(e.message||e)+'. Проверьте публикацию CSV и доступ по ссылке.'; err.style.display='block'; }
+}
 
-document.getElementById('find').addEventListener('click', find);
-document.getElementById('q').addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); find(); }});
+// События
+let deb; document.getElementById('q').addEventListener('input', ()=>{ clearTimeout(deb); deb=setTimeout(()=>{ setShare(); applyFilter(); }, 200); });
 
-// Автоподстановка из ?q= или localStorage
-(function init(){
-  const p = new URL(location.href).searchParams.get('q') || localStorage.getItem('status.q') || '';
-  if(p){ document.getElementById('q').value = p; setShareVisibility(true); }
-  if(p) find();
-})();
+document.getElementById('share').addEventListener('click', async ()=>{ try{ await navigator.clipboard.writeText(location.href); const ok=document.getElementById('ok'); ok.textContent='Ссылка скопирована'; ok.style.display='block'; }catch{} });
+
+document.getElementById('prev').addEventListener('click', ()=>{ if(PAGE>1){ PAGE--; render(); } });
+
+document.getElementById('next').addEventListener('click', ()=>{ const max=Math.ceil(VIEW.length/PER); if(PAGE<max){ PAGE++; render(); } });
+
+document.getElementById('per').addEventListener('change', (e)=>{ PER=+e.target.value||50; PAGE=1; render(); });
+
+document.getElementById('export').addEventListener('click', exportCSV);
+
+init();
 </script>
 </body>
 </html>
